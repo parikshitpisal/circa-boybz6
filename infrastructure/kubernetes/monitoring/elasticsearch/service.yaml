@@ -1,0 +1,53 @@
+# Kubernetes Service manifest for Elasticsearch cluster
+# Version: v1
+# Provides internal communication endpoints for log aggregation and analysis
+# Supports both HTTP (9200) and Transport (9300) protocols
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: elasticsearch
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: elasticsearch
+    app.kubernetes.io/part-of: monitoring
+    app.kubernetes.io/component: database
+    app.kubernetes.io/version: "8.0"
+    app.kubernetes.io/managed-by: kubernetes
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+    monitoring.dollarfunding.com/service-name: elasticsearch
+    monitoring.dollarfunding.com/service-type: database
+
+spec:
+  # Using ClusterIP for internal communication within the Kubernetes cluster
+  type: ClusterIP
+  
+  # Define ports for HTTP and Transport protocols
+  ports:
+    # HTTP port for REST API access
+    - port: 9200
+      name: http
+      protocol: TCP
+      targetPort: http
+      appProtocol: http
+    
+    # Transport port for inter-node communication
+    - port: 9300
+      name: transport
+      protocol: TCP
+      targetPort: transport
+      appProtocol: tcp
+  
+  # Selector to match Elasticsearch pods
+  selector:
+    app.kubernetes.io/name: elasticsearch
+    app.kubernetes.io/part-of: monitoring
+  
+  # No session affinity needed for stateless service discovery
+  sessionAffinity: None
+  
+  # Allow endpoints to be published before they are ready
+  # This is important for Elasticsearch cluster formation
+  publishNotReadyAddresses: true
