@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg 
+  xmlns="http://www.w3.org/2000/svg" 
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  viewBox="0 0 240 60"
+  width="240"
+  height="60"
+  preserveAspectRatio="xMidYMid meet"
+  role="img"
+  aria-labelledby="logo-title logo-desc"
+  xml:lang="en"
+>
+  <!-- Metadata -->
+  <title id="logo-title">Dollar Funding</title>
+  <desc id="logo-desc">Dollar Funding's corporate logo</desc>
+  
+  <!-- Definitions for reusable elements -->
+  <defs>
+    <!-- Dollar symbol path -->
+    <path id="dollar-symbol" 
+      d="M25 10c-8.284 0-15 6.716-15 15 0 8.284 6.716 15 15 15 8.284 0 15-6.716 15-15 0-8.284-6.716-15-15-15zm1 25.5v3.5h-2v-3.5c-4.5-.5-8-3-8.5-7.5h3c.5 3.5 3 5.5 7 5.5 4.5 0 6.5-2 6.5-4.5 0-2.284-1.716-3.5-6.5-4.5-5.5-1-9-3-9-7.5 0-4 3.5-6.5 7.5-7v-3.5h2v3.5c4 .5 7 2.5 7.5 6.5h-3c-.5-2.784-2.716-4.5-6-4.5-3.5 0-6 1.716-6 4.5 0 2.284 1.716 3.5 6.5 4.5 5.5 1 9 3 9 7.5 0 4-3.5 7-8 7.5z"
+      fill="currentColor"
+    />
+  </defs>
+
+  <!-- Main logo group -->
+  <g fill="none" stroke="none">
+    <!-- Dollar symbol -->
+    <use 
+      href="#dollar-symbol" 
+      fill="var(--brand-primary, #000000)" 
+      transform="translate(0, 10)"
+    />
+    
+    <!-- Text "Dollar Funding" -->
+    <g fill="var(--brand-secondary, #000000)" transform="translate(55, 35)">
+      <text 
+        font-family="Arial, sans-serif" 
+        font-size="24" 
+        font-weight="700" 
+        letter-spacing=".5"
+      >
+        Dollar Funding
+      </text>
+    </g>
+    
+    <!-- AI indicator dot -->
+    <circle 
+      cx="225" 
+      cy="15" 
+      r="5" 
+      fill="var(--brand-primary, #000000)" 
+      opacity="0.8"
+    />
+  </g>
+
+  <!-- Fallback handling for older browsers -->
+  <switch>
+    <g requiredFeatures="http://www.w3.org/TR/SVG11/feature#Extensibility">
+      <!-- SVG content as above -->
+    </g>
+    <foreignObject>
+      <img 
+        src="logo-fallback@2x.png" 
+        width="240" 
+        height="60" 
+        alt="Dollar Funding Logo"
+      />
+    </foreignObject>
+  </switch>
+</svg>
