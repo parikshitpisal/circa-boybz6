@@ -1,0 +1,42 @@
+# Kubernetes Service configuration for Document Processor service
+# Version: v1.25+
+# Purpose: Exposes OCR and data extraction functionality internally within the cluster
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: document-processor-svc
+  namespace: ai-application-intake
+  labels:
+    app.kubernetes.io/name: document-processor
+    app.kubernetes.io/part-of: application-processing
+    app.kubernetes.io/component: processor
+    app.kubernetes.io/managed-by: kubectl
+    app.kubernetes.io/created-by: infrastructure-team
+  annotations:
+    # Enable Prometheus metrics scraping
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+    prometheus.io/path: "/metrics"
+
+spec:
+  # Use ClusterIP for internal-only access
+  type: ClusterIP
+  
+  ports:
+    - port: 8000  # Service port
+      targetPort: 8000  # Container port
+      protocol: TCP
+      name: http-processor
+  
+  # Select pods with matching labels
+  selector:
+    app.kubernetes.io/name: document-processor
+    app.kubernetes.io/part-of: application-processing
+  
+  # Disable session affinity for better load distribution
+  sessionAffinity: None
+  
+  # Use cluster-wide internal traffic policy
+  internalTrafficPolicy: Cluster
