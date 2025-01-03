@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: List
+items:
+  # API Gateway ConfigMap
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: api-gateway-config
+      namespace: ai-application-intake
+      labels:
+        app.kubernetes.io/name: api-gateway
+        app.kubernetes.io/part-of: application-processing
+    data:
+      # Server Configuration
+      NODE_ENV: ${ENV}
+      PORT: "3000"
+      API_VERSION: "v1"
+      CORS_ORIGINS: "*"
+      MAX_REQUEST_SIZE: "10485760"  # 10MB in bytes
+
+      # Rate Limiting Configuration
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_STANDARD_TIER: "1000"  # requests per hour
+      RATE_LIMIT_PREMIUM_TIER: "5000"   # requests per hour
+      RATE_LIMIT_WINDOW: "3600"         # 1 hour in seconds
+
+      # Authentication Configuration
+      MFA_ENABLED: "true"
+      MFA_TIMEOUT: "300"                # 5 minutes in seconds
+      JWT_EXPIRY: "3600"               # 1 hour in seconds
+      REFRESH_TOKEN_EXPIRY: "86400"    # 24 hours in seconds
+
+      # Cache Configuration
+      CACHE_TTL: "3600"                # 1 hour in seconds
+
+  # Document Processor ConfigMap
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: document-processor-config
+      namespace: ai-application-intake
+      labels:
+        app.kubernetes.io/name: document-processor
+        app.kubernetes.io/part-of: application-processing
+    data:
+      # Environment Configuration
+      ENV: ${ENV}
+      
+      # OCR Configuration
+      OCR_CONFIDENCE_THRESHOLD: "0.95"
+      OCR_SUPPORTED_LANGUAGES: "eng"
+      CLASSIFIER_CONFIDENCE_THRESHOLD: "0.90"
+      
+      # Processing Configuration
+      PROCESSING_BATCH_SIZE: "100"
+      PROCESSING_TIMEOUT: "300"         # 5 minutes in seconds
+      MAX_RETRIES: "3"
+      RETRY_DELAY: "5000"              # 5 seconds in milliseconds
+      MAX_DOCUMENT_SIZE: "25000000"    # 25MB in bytes
+      
+      # Resource Configuration
+      WORKER_THREADS: "4"
+      MEMORY_LIMIT: "8192"             # 8GB in MB
+      TEMP_STORAGE_PATH: "/tmp/processing"
+      ERROR_THRESHOLD: "0.05"          # 5% error threshold
+
+  # Email Service ConfigMap
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: email-service-config
+      namespace: ai-application-intake
+      labels:
+        app.kubernetes.io/name: email-service
+        app.kubernetes.io/part-of: application-processing
+    data:
+      # Environment Configuration
+      ENV: ${ENV}
+      
+      # Email Server Configuration
+      IMAP_PORT: "993"
+      SMTP_PORT: "587"
+      MONITORED_EMAIL: "submissions@dollarfunding.com"
+      
+      # Connection Pool Configuration
+      EMAIL_POOL_SIZE: "5"
+      EMAIL_IDLE_TIMEOUT: "300000"     # 5 minutes in milliseconds
+      CONNECTION_TIMEOUT: "30000"      # 30 seconds in milliseconds
+      EMAIL_CHECK_INTERVAL: "60000"    # 1 minute in milliseconds
+      
+      # Attachment Configuration
+      MAX_ATTACHMENTS: "10"
+      MAX_ATTACHMENT_SIZE: "26214400"  # 25MB in bytes
+      ALLOWED_FILE_TYPES: "application/pdf"
+      
+      # Security Configuration
+      ATTACHMENT_SCAN_ENABLED: "true"
+      VIRUS_SCAN_TIMEOUT: "60000"      # 1 minute in milliseconds
+      RETRY_ATTEMPTS: "3"
