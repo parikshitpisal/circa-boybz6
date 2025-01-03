@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: List
+items:
+  # Main application namespace for AI-Driven Application Intake Platform
+  - apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: ai-application-intake
+      labels:
+        name: ai-application-intake
+        environment: ${ENV}
+        # Enable Istio service mesh injection
+        istio-injection: enabled
+        app.kubernetes.io/part-of: application-processing
+        # Enforce strict TLS mode for all communication
+        security.istio.io/tlsMode: strict
+        # Enforce restricted pod security standards
+        pod-security.kubernetes.io/enforce: restricted
+      annotations:
+        description: "Main namespace for AI-Driven Application Intake Platform components"
+        # Enable automatic mutual TLS
+        security.istio.io/auto-mtls: "true"
+        # Enable network isolation
+        network-policy.kubernetes.io/isolated: "true"
+        # Mark namespace as containing sensitive data
+        compliance.security.io/data-classification: sensitive
+
+  # Monitoring namespace for observability tools
+  - apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: monitoring
+      labels:
+        name: monitoring
+        environment: ${ENV}
+        # Enable Istio service mesh injection
+        istio-injection: enabled
+        app.kubernetes.io/part-of: observability
+        # Enforce strict TLS mode for all communication
+        security.istio.io/tlsMode: strict
+        # Enforce restricted pod security standards
+        pod-security.kubernetes.io/enforce: restricted
+      annotations:
+        description: "Namespace for monitoring and observability tools"
+        # Enable automatic mutual TLS
+        security.istio.io/auto-mtls: "true"
+        # Enable network isolation
+        network-policy.kubernetes.io/isolated: "true"
+        # Enable Prometheus scraping
+        monitoring.security.io/scrape: "true"
