@@ -1,0 +1,110 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: monitoring
+    app.kubernetes.io/component: metrics
+data:
+  prometheus.yml: |
+    global:
+      # Scrape metrics every 15 seconds
+      scrape_interval: 15s
+      # Evaluate rules every 15 seconds
+      evaluation_interval: 15s
+      # Add environment label to all time series
+      external_labels:
+        environment: ${ENV}
+
+    # Load alerting rules from mounted rules directory
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+
+    scrape_configs:
+      # Auto-discover and scrape metrics from annotated pods
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          # Keep only pods with prometheus.io/scrape=true annotation
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          # Add pod metadata as labels
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+
+      # API Gateway metrics for processing time tracking
+      - job_name: api-gateway
+        kubernetes_sd_configs:
+          - role: service
+            namespaces:
+              names:
+                - ai-application-intake
+        metrics_path: /metrics
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_name]
+            regex: api-gateway
+            action: keep
+          # Add service metadata as labels  
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_service_name]
+            target_label: service
+
+      # Document processor metrics for OCR accuracy monitoring
+      - job_name: document-processor
+        kubernetes_sd_configs:
+          - role: service
+            namespaces:
+              names:
+                - ai-application-intake
+        metrics_path: /metrics
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_name]
+            regex: document-processor
+            action: keep
+          # Add service metadata as labels
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_service_name]
+            target_label: service
+
+      # System uptime monitoring
+      - job_name: kube-state-metrics
+        kubernetes_sd_configs:
+          - role: service
+            namespaces:
+              names:
+                - monitoring
+        metrics_path: /metrics
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_name]
+            regex: kube-state-metrics
+            action: keep
+
+    # Alertmanager configuration
+    alerting:
+      alertmanagers:
+        - kubernetes_sd_configs:
+            - role: pod
+              namespaces:
+                names:
+                  - monitoring
+          path_prefix: /
+          scheme: http
+          timeout: 10s
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+              regex: alertmanager
+              action: keep
