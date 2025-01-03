@@ -1,0 +1,190 @@
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight UTC
+  workflow_run:
+    workflows: ['ci']
+    types: [completed]
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  SCAN_SEVERITY_THRESHOLD: high
+
+jobs:
+  codeql-analysis:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript, typescript, python
+          queries: security-extended,security-and-quality
+          config-file: ./.github/codeql/codeql-config.yml
+          paths-ignore: |
+            **/node_modules/**
+            **/dist/**
+            **/build/**
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:javascript,typescript,python"
+
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    needs: codeql-analysis
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Setup Snyk
+        uses: snyk/actions/setup@v1
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Scan Backend Dependencies
+        run: |
+          cd src/backend
+          npm ci
+          snyk test --severity-threshold=${{ env.SCAN_SEVERITY_THRESHOLD }} --all-projects
+
+      - name: Scan Frontend Dependencies
+        run: |
+          cd src/web
+          npm ci
+          snyk test --severity-threshold=${{ env.SCAN_SEVERITY_THRESHOLD }}
+
+      - name: Scan Python Dependencies
+        run: |
+          pip install safety
+          safety check --full-report --output json > safety-report.json
+
+      - name: Upload Dependency Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-scan-reports
+          path: |
+            **/snyk-report.json
+            safety-report.json
+
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    needs: dependency-scan
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.10.0
+        with:
+          scan-type: 'fs,config'
+          ignore-unfixed: true
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: ${{ env.SCAN_SEVERITY_THRESHOLD }}
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: container-security
+
+  secret-scan:
+    name: Secret Detection Scan
+    runs-on: ubuntu-latest
+    needs: container-scan
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          config-path: ./.github/gitleaks.toml
+          format: sarif
+          report-path: gitleaks-report.sarif
+
+      - name: Upload secret scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: gitleaks-report.sarif
+          category: secret-detection
+
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [codeql-analysis, dependency-scan, container-scan, secret-scan]
+    if: failure()
+
+    steps:
+      - name: Notify Security Issues
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          custom_payload: |
+            {
+              "attachments": [{
+                "color": "danger",
+                "title": "Security Scan Failed",
+                "text": "Security vulnerabilities detected in the latest scan. Please check the GitHub Security tab for details.",
+                "fields": [
+                  {
+                    "title": "Workflow",
+                    "value": "Security Scan",
+                    "short": true
+                  },
+                  {
+                    "title": "Repository",
+                    "value": "${{ github.repository }}",
+                    "short": true
+                  }
+                ]
+              }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Send Email Notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "Security Scan Failed - ${{ github.repository }}"
+          body: "Security vulnerabilities were detected in the latest scan. Please check the GitHub Security tab for details."
+          to: ${{ secrets.SECURITY_TEAM_EMAIL }}
+          from: GitHub Actions
