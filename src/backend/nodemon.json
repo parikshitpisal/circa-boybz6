@@ -1,0 +1,31 @@
+{
+  "watch": [
+    "services/api-gateway/src/**/*.ts",
+    "services/email-service/src/**/*.ts",
+    "shared/**/*.ts"
+  ],
+  "ignore": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "node_modules",
+    "dist",
+    "coverage",
+    ".git"
+  ],
+  "ext": "ts,json",
+  "exec": "ts-node",
+  "execMap": {
+    "ts": "ts-node"
+  },
+  "env": {
+    "NODE_ENV": "development",
+    "TS_NODE_PROJECT": "./tsconfig.json"
+  },
+  "events": {
+    "restart": "echo 'App restarted due to changes'",
+    "crash": "echo 'App crashed - waiting for file changes before starting...'"
+  },
+  "delay": "1500",
+  "verbose": true,
+  "legacyWatch": false
+}
