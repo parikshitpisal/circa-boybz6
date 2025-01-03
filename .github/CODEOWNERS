@@ -1,0 +1,25 @@
+*                                               @project-leads
+
+# Backend service ownership
+src/backend/                                    @backend-team @security-team
+src/backend/services/document-processor/        @ml-team @backend-team @security-team
+src/backend/services/email-service/             @backend-team @security-team
+src/backend/shared/                            @backend-team @security-team @project-leads
+
+# Frontend application
+src/web/                                       @frontend-team @security-team
+
+# Infrastructure and deployment
+infrastructure/                                @devops-team @security-team @project-leads
+infrastructure/kubernetes/                     @devops-team @security-team
+infrastructure/terraform/                      @devops-team @security-team @project-leads
+.github/workflows/                             @devops-team @security-team
+
+# Database schemas and data models
+**/*.schema.ts                                 @backend-team @data-team @security-team
+
+# Security-critical code
+**/security*.ts                               @security-team @project-leads
+
+# Test framework and coverage
+**/test/**                                    @qa-team @security-team
