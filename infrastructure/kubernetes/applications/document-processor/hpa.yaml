@@ -1,0 +1,75 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: document-processor-hpa
+  namespace: ai-application-intake
+  labels:
+    app.kubernetes.io/name: document-processor
+    app.kubernetes.io/part-of: application-processing
+    app.kubernetes.io/component: processor
+    app.kubernetes.io/managed-by: kubernetes
+  annotations:
+    description: "HPA for document processor service"
+    scaling.policy: "queue-based-with-resource-metrics"
+    kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"autoscaling/v2","kind":"HorizontalPodAutoscaler"}
+
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: document-processor
+
+  # Set minimum replicas to handle base load of 1000+ daily applications
+  minReplicas: 3
+  # Maximum replicas based on peak load and resource optimization
+  maxReplicas: 15
+
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+    # Queue length-based scaling
+    - type: External
+      external:
+        metric:
+          name: rabbitmq_queue_messages
+          selector:
+            matchLabels:
+              queue: document-processing
+        target:
+          type: AverageValue
+          averageValue: "100"
+
+  # Scaling behavior configuration
+  behavior:
+    scaleUp:
+      # Quick scale up to handle sudden load increases
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+
+    scaleDown:
+      # Conservative scale down to prevent thrashing
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Pods
+        value: 1
+        periodSeconds: 120
+      selectPolicy: Min
