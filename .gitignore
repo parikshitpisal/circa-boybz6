@@ -1,0 +1,101 @@
+*.env.*
+.env.development
+.env.staging
+.env.production
+
+# Dependencies
+node_modules/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Build Outputs
+dist/
+build/
+*.egg-info/
+
+# Python Specific
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+.tox/
+*.pyo
+*.pyd
+
+# IDE and Editor Files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.bak
+*.sublime-workspace
+*.sublime-project
+
+# Infrastructure
+*.tfstate
+*.tfstate.backup
+.terraform/
+terraform.tfvars
+*.tfvars.json
+.terraformrc
+terraform.rc
+
+# Logs and Reports
+*.log
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+
+# System Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Temporary Files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# Security and Secrets
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+*.keystore
+*.jks
+secrets.yaml
+secrets.yml
+*secret*
+*password*
+*credential*
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# Package Locks (version these)
+!package-lock.json
+!yarn.lock
+!poetry.lock
+
+# Documentation Build
+docs/_build/
+site/
+
+# Cache Directories
+.cache/
+.npm/
+.yarn/
