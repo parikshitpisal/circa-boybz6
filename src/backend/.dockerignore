@@ -1,0 +1,125 @@
+node_modules/
+dist/
+coverage/
+.npm/
+.eslintcache
+
+# Python artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+
+# Environment and configuration
+.env*
+.git/
+.gitignore
+.dockerignore
+
+# Test files
+tests/
+coverage/
+
+# Logs and temporary files
+*.log
+tmp/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Documentation
+README.md
+
+# Development artifacts
+docker-compose.yml
+docker-compose.*.yml
+
+# Build artifacts
+build/
+*.tsbuildinfo
+
+# Cache directories
+.cache/
+.temp/
+
+# Local development files
+local/
+dev/
+
+# Debug files
+*.debug
+*.pdb
+
+# System files
+Thumbs.db
+.DS_Store
+
+# Dependency lock files (let container build generate fresh ones)
+package-lock.json
+yarn.lock
+poetry.lock
+
+# Backup files
+*.bak
+*~
+
+# Configuration files that should be managed outside container
+config.local.*
+settings.local.*
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+.svn/
+.hg/
+
+# CI/CD artifacts
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+.github/
+
+# Asset source files (only needed for development)
+*.sketch
+*.fig
+*.xd
+*.psd
+
+# Monitoring and profiling
+.clinic/
+profile/
+*.heapsnapshot
+*.cpuprofile
+
+# Database files
+*.sqlite
+*.db
+
+# Certificates and keys (should be mounted at runtime)
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.priv
+
+# Compressed files
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+
+# Media and large binary files
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.mp3
+*.wav
+*.ogg
