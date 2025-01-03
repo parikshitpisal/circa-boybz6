@@ -1,0 +1,48 @@
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: email-service-hpa
+  namespace: ai-application-intake
+  labels:
+    app.kubernetes.io/name: email-service
+    app.kubernetes.io/part-of: application-processing
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: email-service
+  minReplicas: 2 # Minimum pods to handle base load
+  maxReplicas: 10 # Maximum pods to handle peak load of 1000+ daily applications
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70 # Scale up when CPU utilization exceeds 70%
+    
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80 # Scale up when memory utilization exceeds 80%
+  
+  behavior:
+    # Scale up behavior
+    scaleUp:
+      stabilizationWindowSeconds: 60 # Wait 1 minute before scaling up again
+      policies:
+        - type: Pods
+          value: 2 # Add up to 2 pods at a time
+          periodSeconds: 60 # Every 1 minute
+    
+    # Scale down behavior
+    scaleDown:
+      stabilizationWindowSeconds: 300 # Wait 5 minutes before scaling down
+      policies:
+        - type: Pods
+          value: 1 # Remove 1 pod at a time
+          periodSeconds: 120 # Every 2 minutes
