@@ -1,0 +1,71 @@
+# Fluentd v1.16 configuration for production log collection and forwarding
+# Kubernetes API version: v1.25+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentd-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: fluentd
+    app.kubernetes.io/part-of: monitoring
+    app.kubernetes.io/component: logging
+    app.kubernetes.io/version: v1.16
+data:
+  fluent.conf: |
+    # Input source configuration for container logs
+    <source>
+      @type tail
+      path /var/log/containers/*.log
+      pos_file /var/log/fluentd-containers.log.pos
+      tag kubernetes.*
+      read_from_head true
+      <parse>
+        @type json
+        time_format %Y-%m-%dT%H:%M:%S.%NZ
+      </parse>
+    </source>
+
+    # Kubernetes metadata enrichment filter
+    <filter kubernetes.**>
+      @type kubernetes_metadata
+      watch true
+    </filter>
+
+    # Record transformation for standardized log format
+    <filter kubernetes.**>
+      @type record_transformer
+      enable_ruby true
+      <record>
+        timestamp ${time.strftime('%Y-%m-%dT%H:%M:%S.%NZ')}
+        log_level ${record['level'] || record['severity'] || 'info'}
+        container_name ${record.dig('kubernetes', 'container_name')}
+        namespace ${record.dig('kubernetes', 'namespace_name')}
+        pod ${record.dig('kubernetes', 'pod_name')}
+        node ${record.dig('kubernetes', 'host')}
+        application ${record.dig('kubernetes', 'labels', 'app.kubernetes.io/name')}
+      </record>
+    </filter>
+
+    # Output configuration for Elasticsearch
+    <match kubernetes.**>
+      @type elasticsearch
+      host elasticsearch.monitoring.svc.cluster.local
+      port 9200
+      logstash_format true
+      logstash_prefix k8s
+      reconnect_on_error true
+      reload_on_failure true
+      
+      <buffer>
+        @type file
+        path /var/log/fluentd-buffers/kubernetes.system.buffer
+        flush_mode interval
+        retry_type exponential_backoff
+        flush_interval 5s
+        retry_forever false
+        retry_max_interval 30
+        max_retry_wait 300s
+        total_limit_size 512MB
+        chunk_limit_size 16MB
+      </buffer>
+    </match>
