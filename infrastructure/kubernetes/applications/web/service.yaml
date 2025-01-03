@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+  namespace: ai-application-intake
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: application-processing
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/version: 1.0.0
+    app.kubernetes.io/managed-by: kubectl
+    monitoring.dollarfunding.com/enabled: "true"
+    security.dollarfunding.com/zone: frontend
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "80"
+    service.kubernetes.io/topology-aware-hints: "auto"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+      name: http-web
+      appProtocol: http
+  selector:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: application-processing
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+  publishNotReadyAddresses: false
+  internalTrafficPolicy: Cluster
