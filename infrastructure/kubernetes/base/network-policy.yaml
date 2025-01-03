@@ -1,0 +1,69 @@
+apiVersion: networking.k8s.io/v1
+kind: List
+items:
+  # Default deny-all policy to establish zero-trust baseline
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: default-deny-all
+      namespace: ai-application-intake
+      labels:
+        app.kubernetes.io/part-of: ai-application-intake
+        app.kubernetes.io/component: network-policy
+    spec:
+      # Empty podSelector matches all pods in namespace
+      podSelector: {}
+      policyTypes:
+        - Ingress
+        - Egress
+
+  # Allow monitored access to API Gateway
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-api-gateway-ingress
+      namespace: ai-application-intake
+      labels:
+        app.kubernetes.io/part-of: ai-application-intake
+        app.kubernetes.io/component: network-policy
+    spec:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: api-gateway
+          app.kubernetes.io/component: api
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  name: monitoring
+          ports:
+            - port: 3000
+              protocol: TCP
+
+  # Allow secure communication between API Gateway and Document Processor
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-document-processor-ingress
+      namespace: ai-application-intake
+      labels:
+        app.kubernetes.io/part-of: ai-application-intake
+        app.kubernetes.io/component: network-policy
+    spec:
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: document-processor
+          app.kubernetes.io/component: processor
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: api-gateway
+                  app.kubernetes.io/component: api
+          ports:
+            - port: 8000
+              protocol: TCP
