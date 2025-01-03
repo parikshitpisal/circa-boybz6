@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: email-service
+  namespace: ai-application-intake
+  labels:
+    app.kubernetes.io/name: email-service
+    app.kubernetes.io/part-of: application-processing
+    app.kubernetes.io/component: email-processor
+    app.kubernetes.io/managed-by: kubernetes
+  annotations:
+    # Enable topology-aware routing for better pod distribution
+    service.kubernetes.io/topology-aware-hints: "auto"
+    # Enable Prometheus metrics scraping
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3001"
+
+spec:
+  # Use ClusterIP for internal service communication
+  type: ClusterIP
+  
+  # Select pods with matching labels
+  selector:
+    app.kubernetes.io/name: email-service
+    app.kubernetes.io/component: email-processor
+  
+  # Define service ports
+  ports:
+    # Main application port for IMAP/SMTP processing
+    - name: http
+      port: 3001
+      targetPort: 3001
+      protocol: TCP
+    
+    # Metrics port for monitoring
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  
+  # Enable session affinity for connection pooling
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      # Set 5-minute timeout as per email processing specifications
+      timeoutSeconds: 300
