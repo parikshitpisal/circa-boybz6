@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: monitoring
+  labels:
+    app: grafana
+    component: monitoring
+    part-of: observability
+data:
+  grafana.ini: |
+    [server]
+    protocol = http
+    http_port = 3000
+    domain = grafana.monitoring.svc.cluster.local
+    root_url = %(protocol)s://%(domain)s:%(http_port)s/
+    serve_from_sub_path = true
+    
+    [auth]
+    disable_login_form = false
+    disable_signout_menu = false
+    login_maximum_inactive_lifetime_duration = 7d
+    login_maximum_lifetime_duration = 30d
+    
+    [security]
+    admin_user = admin
+    admin_password = ${GRAFANA_ADMIN_PASSWORD}
+    secret_key = ${GRAFANA_SECRET_KEY}
+    cookie_secure = true
+    cookie_samesite = strict
+    allow_embedding = false
+    
+    [users]
+    allow_sign_up = false
+    auto_assign_org = true
+    auto_assign_org_role = Editor
+    default_theme = dark
+    
+    [dashboards]
+    versions_to_keep = 20
+    min_refresh_interval = 5s
+    default_home_dashboard_path = /var/lib/grafana/dashboards/overview.json
+    
+    [alerting]
+    enabled = true
+    execute_alerts = true
+    error_or_timeout = alerting
+    nodata_or_nullvalues = alerting
+    evaluation_timeout_seconds = 30
+    notification_timeout_seconds = 30
+    
+    [metrics]
+    enabled = true
+    basic_auth_username = ${METRICS_USERNAME}
+    basic_auth_password = ${METRICS_PASSWORD}
+    
+    [log]
+    mode = console file
+    level = info
+    
+    [paths]
+    data = /var/lib/grafana
+    logs = /var/log/grafana
+    plugins = /var/lib/grafana/plugins
+    provisioning = /etc/grafana/provisioning
+    
+    [analytics]
+    reporting_enabled = false
+    check_for_updates = true
+    
+    [unified_alerting]
+    enabled = true
+    evaluation_timeout = 30s
+    max_attempts = 3
+    min_interval = 10s
+
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+        version: 1
+        editable: true
+        jsonData:
+          timeInterval: "15s"
+          queryTimeout: "30s"
+          httpMethod: "POST"
+          manageAlerts: true
+          alertmanagerUid: "alertmanager"
+          exemplarTraceIdDestinations:
+            - name: trace_id
+              datasourceUid: tempo
+        secureJsonData:
+          httpHeaderValue1: "${PROMETHEUS_API_KEY}"
+
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: Default
+        folder: ""
+        type: file
+        options:
+          path: /var/lib/grafana/dashboards
+          foldersFromFilesStructure: true
+        allowUiUpdates: true
+        updateIntervalSeconds: 30
+        disableDeletion: false
+
+  notifiers.yaml: |
+    apiVersion: 1
+    notifiers:
+      - name: Default-Slack
+        type: slack
+        uid: slack-default
+        org_id: 1
+        is_default: true
+        settings:
+          url: "${SLACK_WEBHOOK_URL}"
+          recipient: "#monitoring-alerts"
+          mentionChannel: "here"
+          
+  custom.ini: |
+    [auth.proxy]
+    enabled = false
+    header_name = X-WEBAUTH-USER
+    header_property = username
+    auto_sign_up = false
+    
+    [smtp]
+    enabled = true
+    host = "${SMTP_HOST}:587"
+    user = "${SMTP_USER}"
+    password = "${SMTP_PASSWORD}"
+    from_address = grafana@dollarfunding.com
+    from_name = Grafana Alerts
+    
+    [panels]
+    disable_sanitize_html = false
+    enable_alpha = false
