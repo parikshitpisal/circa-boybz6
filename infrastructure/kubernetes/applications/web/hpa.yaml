@@ -1,0 +1,63 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-hpa
+  namespace: ai-application-intake
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: application-processing
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/managed-by: kubernetes
+    app.kubernetes.io/created-by: hpa-controller
+  annotations:
+    kubernetes.io/description: "HPA for web frontend application"
+    kubernetes.io/change-cause: "Initial HPA configuration"
+
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web-deployment
+
+  # Minimum 2 replicas for high availability
+  minReplicas: 2
+  # Maximum 8 replicas based on technical specifications
+  maxReplicas: 8
+
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+  behavior:
+    # Scale up behavior
+    scaleUp:
+      # 60 second window to prevent rapid scaling
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2  # Add up to 2 pods at a time
+          periodSeconds: 60
+      selectPolicy: Max
+
+    # Scale down behavior
+    scaleDown:
+      # 5 minute window to prevent premature scale down
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1  # Remove 1 pod at a time
+          periodSeconds: 120
+      selectPolicy: Min
