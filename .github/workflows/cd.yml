@@ -1,0 +1,216 @@
+name: Continuous Deployment
+
+on:
+  workflow_run:
+    workflows: ["Continuous Integration"]
+    types:
+      - completed
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+  DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+jobs:
+  deploy-development:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    environment: development
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download CI artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: production-artifacts
+          path: artifacts
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push Docker images
+        run: |
+          docker build -t $ECR_REGISTRY/ai-intake-api:dev-${{ github.sha }} ./artifacts/backend
+          docker build -t $ECR_REGISTRY/ai-intake-web:dev-${{ github.sha }} ./artifacts/frontend
+          docker build -t $ECR_REGISTRY/ai-intake-processor:dev-${{ github.sha }} ./artifacts/document-processor
+          
+          docker push $ECR_REGISTRY/ai-intake-api:dev-${{ github.sha }}
+          docker push $ECR_REGISTRY/ai-intake-web:dev-${{ github.sha }}
+          docker push $ECR_REGISTRY/ai-intake-processor:dev-${{ github.sha }}
+
+      - name: Deploy to ECS Development
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          cluster: ai-intake-dev
+          service: application-processing-dev
+          task-definition: .aws/task-definitions/development.json
+          wait-for-service-stability: true
+
+      - name: Run health checks
+        run: |
+          chmod +x ./scripts/health-check.sh
+          ./scripts/health-check.sh \
+            --environment development \
+            --timeout 60 \
+            --error-threshold 5 \
+            --latency-threshold 1000
+
+      - name: Initialize monitoring
+        run: |
+          curl -X POST "https://api.datadoghq.com/api/v1/deployment" \
+            -H "Content-Type: application/json" \
+            -H "DD-API-KEY: ${DATADOG_API_KEY}" \
+            -d @- << EOF
+            {
+              "service": "ai-intake-platform",
+              "env": "development",
+              "version": "${{ github.sha }}",
+              "git_sha": "${{ github.sha }}"
+            }
+          EOF
+
+      - name: Notify deployment status
+        if: always()
+        uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          webhook-url: ${{ env.SLACK_WEBHOOK_URL }}
+          message: "Development deployment ${{ job.status }} for commit ${{ github.sha }}"
+
+  deploy-staging:
+    needs: deploy-development
+    runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 45
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Tag images for staging
+        run: |
+          docker pull $ECR_REGISTRY/ai-intake-api:dev-${{ github.sha }}
+          docker pull $ECR_REGISTRY/ai-intake-web:dev-${{ github.sha }}
+          docker pull $ECR_REGISTRY/ai-intake-processor:dev-${{ github.sha }}
+          
+          docker tag $ECR_REGISTRY/ai-intake-api:dev-${{ github.sha }} $ECR_REGISTRY/ai-intake-api:staging-${{ github.sha }}
+          docker tag $ECR_REGISTRY/ai-intake-web:dev-${{ github.sha }} $ECR_REGISTRY/ai-intake-web:staging-${{ github.sha }}
+          docker tag $ECR_REGISTRY/ai-intake-processor:dev-${{ github.sha }} $ECR_REGISTRY/ai-intake-processor:staging-${{ github.sha }}
+          
+          docker push $ECR_REGISTRY/ai-intake-api:staging-${{ github.sha }}
+          docker push $ECR_REGISTRY/ai-intake-web:staging-${{ github.sha }}
+          docker push $ECR_REGISTRY/ai-intake-processor:staging-${{ github.sha }}
+
+      - name: Deploy to ECS Staging
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          cluster: ai-intake-staging
+          service: application-processing-staging
+          task-definition: .aws/task-definitions/staging.json
+          wait-for-service-stability: true
+
+      - name: Run extended health checks
+        run: |
+          chmod +x ./scripts/health-check.sh
+          ./scripts/health-check.sh \
+            --environment staging \
+            --timeout 120 \
+            --error-threshold 2 \
+            --latency-threshold 500
+
+      - name: Report metrics to Datadog
+        uses: datadog/action-ci-reporting@v1
+        with:
+          api-key: ${{ env.DATADOG_API_KEY }}
+          environment: staging
+          service: ai-intake-platform
+          deployment-version: ${{ github.sha }}
+
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 60
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Tag images for production
+        run: |
+          docker pull $ECR_REGISTRY/ai-intake-api:staging-${{ github.sha }}
+          docker pull $ECR_REGISTRY/ai-intake-web:staging-${{ github.sha }}
+          docker pull $ECR_REGISTRY/ai-intake-processor:staging-${{ github.sha }}
+          
+          docker tag $ECR_REGISTRY/ai-intake-api:staging-${{ github.sha }} $ECR_REGISTRY/ai-intake-api:prod-${{ github.sha }}
+          docker tag $ECR_REGISTRY/ai-intake-web:staging-${{ github.sha }} $ECR_REGISTRY/ai-intake-web:prod-${{ github.sha }}
+          docker tag $ECR_REGISTRY/ai-intake-processor:staging-${{ github.sha }} $ECR_REGISTRY/ai-intake-processor:prod-${{ github.sha }}
+          
+          docker push $ECR_REGISTRY/ai-intake-api:prod-${{ github.sha }}
+          docker push $ECR_REGISTRY/ai-intake-web:prod-${{ github.sha }}
+          docker push $ECR_REGISTRY/ai-intake-processor:prod-${{ github.sha }}
+
+      - name: Deploy to ECS Production
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          cluster: ai-intake-prod
+          service: application-processing-prod
+          task-definition: .aws/task-definitions/production.json
+          wait-for-service-stability: true
+
+      - name: Monitor deployment health
+        run: |
+          chmod +x ./scripts/deployment-monitor.sh
+          ./scripts/deployment-monitor.sh \
+            --environment production \
+            --timeout 300 \
+            --error-threshold 1 \
+            --latency-threshold 300 \
+            --cpu-threshold 60
+
+      - name: Verify deployment
+        run: |
+          chmod +x ./scripts/verify-deployment.sh
+          ./scripts/verify-deployment.sh \
+            --environment production \
+            --version ${{ github.sha }}
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          chmod +x ./scripts/rollback.sh
+          ./scripts/rollback.sh \
+            --environment production \
+            --version ${{ github.sha }}
+
+      - name: Final deployment notification
+        if: always()
+        uses: act10ns/slack@v1
+        with:
+          status: ${{ job.status }}
+          webhook-url: ${{ env.SLACK_WEBHOOK_URL }}
+          message: "Production deployment ${{ job.status }} for version ${{ github.sha }}"
