@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: kibana
+    app.kubernetes.io/part-of: monitoring
+    app.kubernetes.io/component: visualization
+    app.kubernetes.io/version: "8.0"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5601
+      name: http
+      protocol: TCP
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: kibana
