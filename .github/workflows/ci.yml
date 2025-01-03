@@ -1,0 +1,277 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18.x'
+  PYTHON_VERSION: '3.11'
+  NODE_ENV: 'test'
+  CI: true
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules
+            ~/.npm
+            .eslintcache
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: |
+          cd src/backend
+          npm ci
+
+      - name: Run ESLint
+        run: |
+          cd src/backend
+          npm run lint
+        
+      - name: Run Prettier check
+        run: |
+          cd src/backend
+          npm run format:check
+
+      - name: Type check
+        run: |
+          cd src/backend
+          npm run typecheck
+
+      - name: Run unit tests
+        run: |
+          cd src/backend
+          npm run test:ci
+        env:
+          JEST_JUNIT_OUTPUT_DIR: ./test-results/
+          JEST_JUNIT_OUTPUT_NAME: backend-test-results.xml
+
+      - name: Run security audit
+        run: |
+          cd src/backend
+          npm audit
+
+      - name: Build backend
+        run: |
+          cd src/backend
+          npm run build:prod
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: backend-test-results
+          path: src/backend/test-results
+          retention-days: 30
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: backend-coverage
+          path: src/backend/coverage
+          retention-days: 30
+
+  frontend-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules
+            ~/.npm
+            .next/cache
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: |
+          cd src/web
+          npm ci
+
+      - name: Run ESLint
+        run: |
+          cd src/web
+          npm run lint
+
+      - name: Run Prettier check
+        run: |
+          cd src/web
+          npm run format
+
+      - name: Type check
+        run: |
+          cd src/web
+          npm run typecheck
+
+      - name: Run tests
+        run: |
+          cd src/web
+          npm run test:coverage
+        env:
+          JEST_JUNIT_OUTPUT_DIR: ./test-results/
+          JEST_JUNIT_OUTPUT_NAME: frontend-test-results.xml
+
+      - name: Build frontend
+        run: |
+          cd src/web
+          npm run build
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: frontend-test-results
+          path: src/web/test-results
+          retention-days: 30
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-coverage
+          path: src/web/coverage
+          retention-days: 30
+
+  document-processor-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Cache Python packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          cd src/document-processor
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run Pylint
+        run: |
+          cd src/document-processor
+          pylint src tests
+
+      - name: Run type checking
+        run: |
+          cd src/document-processor
+          mypy src tests
+
+      - name: Run tests
+        run: |
+          cd src/document-processor
+          pytest --junitxml=test-results/document-processor-test-results.xml --cov=src --cov-report=xml
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: document-processor-test-results
+          path: src/document-processor/test-results
+          retention-days: 30
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: document-processor-coverage
+          path: src/document-processor/coverage.xml
+          retention-days: 30
+
+  security-scan:
+    needs: [backend-checks, frontend-checks, document-processor-checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript, python
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-results
+          path: results
+          retention-days: 90
+
+  build-artifacts:
+    needs: [security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+
+    steps:
+      - uses: actions/download-artifact@v3
+
+      - name: Package artifacts
+        run: |
+          mkdir -p dist
+          cp -r backend-dist/* dist/backend/
+          cp -r frontend-dist/* dist/frontend/
+          cp -r document-processor-dist/* dist/document-processor/
+
+      - name: Upload production artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: production-artifacts
+          path: dist
+          retention-days: 14
